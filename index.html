@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAHL-X Advanced Chat</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#f5f6fa;display:flex;justify-content:center;align-items:center;height:100vh;}
+.auth-container{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;justify-content:center;align-items:center;background:rgba(0,0,0,0.5);z-index:10;}
+.auth-box{background:#fff;padding:30px;border-radius:14px;box-shadow:0 10px 25px rgba(0,0,0,0.2);width:300px;text-align:center;}
+.auth-box input{width:100%;padding:10px;margin:10px 0;border-radius:10px;border:1px solid #ccc;}
+.auth-box button{width:100%;padding:10px;border:none;border-radius:10px;background:#4cd137;color:#fff;font-size:16px;cursor:pointer;margin-top:10px;}
+.auth-box button:hover{background:#3ebc31;}
+.chat-container{display:flex;flex-direction:column;width:100%;max-width:600px;height:90vh;border-radius:14px;background:#fff;box-shadow:0 10px 25px rgba(0,0,0,0.1);overflow:hidden;position:relative;}
+.chat-header{padding:18px;background:#2f3640;color:#f5f6fa;font-size:1.3rem;font-weight:bold;text-align:center;}
+.chat-messages{flex:1;padding:15px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;background:#f0f0f0;scroll-behavior:smooth;}
+.message{max-width:75%;padding:12px 18px;border-radius:20px;word-wrap:break-word;opacity:0;transform:translateY(10px);animation:fadeIn 0.3s forwards;position:relative;}
+.user-message{align-self:flex-end;background:#4cd137;color:#fff;border-bottom-right-radius:4px;}
+.ai-message{align-self:flex-start;background:#dcdde1;color:#2f3640;border-bottom-left-radius:4px;}
+.typing-indicator{display:flex;gap:4px;margin-top:5px;}
+.typing-indicator span{width:6px;height:6px;background:#2f3640;border-radius:50%;animation:blink 1s infinite;}
+.typing-indicator span:nth-child(2){animation-delay:0.2s;}
+.typing-indicator span:nth-child(3){animation-delay:0.4s;}
+@keyframes blink{0%,80%,100%{opacity:0;}40%{opacity:1;}}
+.chat-input{display:flex;padding:12px;border-top:1px solid #ddd;background:#fff;}
+.chat-input textarea{flex:1;border-radius:12px;border:1px solid #ccc;padding:10px;font-size:16px;resize:none;transition:all 0.2s ease;}
+.chat-input textarea:focus{border-color:#4cd137;outline:none;}
+.chat-input button{margin-left:10px;padding:10px 18px;font-size:16px;border-radius:12px;border:none;cursor:pointer;background:#4cd137;color:#fff;transition:background 0.3s;}
+.chat-input button:hover{background:#3ebc31;}
+img{max-width:100%;border-radius:12px;margin-top:5px;display:block;}
+.like-btn{position:absolute;bottom:-8px;right:-8px;background:#4cd137;color:#fff;width:24px;height:24px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-size:14px;cursor:pointer;}
+.like-btn:hover{background:#3ebc31;}
+@keyframes fadeIn{to{opacity:1;transform:translateY(0);}}
+@media(max-width:650px){.chat-container{height:95vh;}.chat-input textarea{font-size:14px;}.chat-header{font-size:1.1rem;}}
+.select-mode{margin-bottom:10px;padding:5px;border-radius:10px;border:1px solid #ccc;width:100%;font-size:14px;}
+</style>
+</head>
+<body>
+
+<div class="auth-container" id="authContainer">
+    <div class="auth-box">
+        <h2>Welcome to RAHL-X</h2>
+        <input type="text" id="username" placeholder="Enter username"/>
+        <button id="loginBtn">Login</button>
+    </div>
+</div>
+
+<div class="chat-container" id="chatContainer" style="display:none;">
+    <div class="chat-header">RAHL-X Chat</div>
+    <select class="select-mode" id="modeSelect">
+        <option value="royal">Royal Advisor</option>
+        <option value="tech">Tech Guru</option>
+        <option value="creative">Creative Artist</option>
+    </select>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input">
+        <textarea id="prompt" rows="2" placeholder="Type your message..."></textarea>
+        <button id="micBtn">🎤</button>
+        <button id="sendBtn">Send</button>
+    </div>
+</div>
+
+<script>
+const loginBtn = document.getElementById("loginBtn");
+const authContainer = document.getElementById("authContainer");
+const chatContainer = document.getElementById("chatContainer");
+const usernameInput = document.getElementById("username");
+
+loginBtn.addEventListener("click", ()=>{
+    const name=usernameInput.value.trim();
+    if(!name) return alert("Enter username");
+    authContainer.style.display="none";
+    chatContainer.style.display="flex";
+});
+
+const sendBtn=document.getElementById("sendBtn");
+const micBtn=document.getElementById("micBtn");
+const promptInput=document.getElementById("prompt");
+const chatMessages=document.getElementById("chatMessages");
+const modeSelect=document.getElementById("modeSelect");
+
+async function sendPrompt(prompt){
+    addMessage(prompt,'user');
+    promptInput.value='';
+    const typingDiv=addTypingIndicator();
+    const mode=modeSelect.value;
+
+    try{
+        const res=await fetch("https://YOUR_LIVE_BACKEND_URL/ai",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({prompt,mode})
+        });
+        const data=await res.json();
+        removeTypingIndicator(typingDiv);
+        displayResponse(data.response);
+    }catch(e){
+        removeTypingIndicator(typingDiv);
+        addMessage("Error: Could not connect to RAHL-X",'ai');
+    }
+    chatMessages.scrollTop=chatMessages.scrollHeight;
+}
+
+function displayResponse(response){
+    const textMatch=response.match(/<text>([\s\S]*?)<\/text>/);
+    const imageMatches=[...response.matchAll(/<img>(.*?)<\/img>/g)];
+    const modelMatches=[...response.matchAll(/<3d>(.*?)<\/3d>/g)];
+
+    if(textMatch) typeText(textMatch[1]);
+    imageMatches.forEach(match=>{
+        const img=document.createElement("img");
+        img.src=match[1];
+        const msgDiv=document.createElement("div");
+        msgDiv.className='ai-message';
+        msgDiv.appendChild(img);
+        addLikeButton(msgDiv);
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop=chatMessages.scrollHeight;
+    });
+    modelMatches.forEach(match=>{
+        const iframe=document.createElement("iframe");
+        iframe.src=match[1];
+        iframe.width="100%";
+        iframe.height="300";
+        iframe.style.border="none";
+        const msgDiv=document.createElement("div");
+        msgDiv.className='ai-message';
+        msgDiv.appendChild(iframe);
+        addLikeButton(msgDiv);
+        chatMessages.appendChild(msgDiv);
+    });
+}
+
+function typeText(text){
+    const msgDiv=document.createElement("div");
+    msgDiv.className='message ai-message';
+    chatMessages.appendChild(msgDiv);
+    addLikeButton(msgDiv);
+
+    let i=0;
+    function type(){if(i<text.length){msgDiv.textContent+=text[i++];chatMessages.scrollTop=chatMessages.scrollHeight;setTimeout(type,25);}else speak(text);}
+    type();
+}
+
+function addMessage(message,type){
+    const msgDiv=document.createElement("div");
+    msgDiv.className=type==='user'?'message user-message':'message ai-message';
+    msgDiv.textContent=message;
+    chatMessages.appendChild(msgDiv);
+    addLikeButton(msgDiv);
+    chatMessages.scrollTop=chatMessages.scrollHeight;
+    return msgDiv;
+}
+
+function addTypingIndicator(){
+    const div=document.createElement("div");
+    div.className='message ai-message';
+    const dots=document.createElement("div");
+    dots.className='typing-indicator';
+    dots.innerHTML='<span></span><span></span><span></span>';
+    div.appendChild(dots);
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop=chatMessages.scrollHeight;
+    return div;
+}
+
+function removeTypingIndicator(div){if(div) chatMessages.removeChild(div);}
+function speak(text){const utterance=new SpeechSynthesisUtterance(text);utterance.lang="en-US";speechSynthesis.speak(utterance);}
+function startMic(){if(!("webkitSpeechRecognition" in window)) return alert("Voice input not supported");const recognition=new webkitSpeechRecognition();recognition.lang="en-US";recognition.interimResults=false;recognition.maxAlternatives=1;recognition.onresult=(event)=>{promptInput.value=event.results[0][0].transcript;sendPrompt(event.results[0][0].transcript);};recognition.start();}
+sendBtn.addEventListener("click",()=>{const prompt=promptInput.value.trim();if(prompt) sendPrompt(prompt);});
+micBtn.addEventListener("click", startMic);
+
+
+function addLikeButton(msgDiv){
+    const btn=document.createElement("div");
+    btn.className="like-btn";
+    btn.textContent="❤";
+    btn.onclick=()=>{alert("You liked this message!");};
+    msgDiv.appendChild(btn);
+}
+</script>
+</body>
+  </html>
