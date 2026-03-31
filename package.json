@@ -1,0 +1,14 @@
+{
+  "name": "rahl-x-backend",
+  "version": "1.0.0",
+  "main": "rahl-backend.js",
+  "scripts": {
+    "start": "node rahl-backend.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "openai": "^4.5.0"
+  }
+}
